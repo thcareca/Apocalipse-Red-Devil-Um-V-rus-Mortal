@@ -52,17 +52,20 @@ class Camera:
         self.shake_offset_y = 0
 
     def apply(self, entity):
+        # Adiciona o offset do shake da câmera à posição da entidade
         return entity.rect.move(self.camera.topleft[0] + self.shake_offset_x,
-                                self.camera.topleft[1] + self.shake_offset_y)
+                                 self.camera.topleft[1] + self.shake_offset_y)
 
     def apply_rect(self, rect):
+        # Adiciona o offset do shake da câmera à posição de um retângulo (útil para tiles)
         return rect.move(self.camera.topleft[0] + self.shake_offset_x,
-                        self.camera.topleft[1] + self.shake_offset_y)
+                         self.camera.topleft[1] + self.shake_offset_y)
 
     def update(self, target, shake_duracao=0, shake_intensidade=0):
         x = -target.rect.centerx + LARGURA_TELA // 2
         y = -target.rect.centery + ALTURA_TELA // 2
 
+        # Limita a câmera para não mostrar áreas fora do mapa
         x = min(0, x)
         y = min(0, y)
         x = max(-(self.largura_mundo - LARGURA_TELA), x)
@@ -70,6 +73,7 @@ class Camera:
 
         self.camera = pygame.Rect(x, y, LARGURA_TELA, ALTURA_TELA)
 
+        # Atualiza o shake da câmera
         self.shake_offset_x = 0
         self.shake_offset_y = 0
         if shake_duracao > 0:
@@ -110,36 +114,37 @@ class Jogador(pygame.sprite.Sprite):
         if teclas[pygame.K_DOWN] or teclas[pygame.K_s]:
             self.rect.y += self.velocidade
 
+        # Limita o jogador dentro dos limites do mapa
         self.rect.left = max(0, self.rect.left)
         self.rect.right = min(LARGURA_MUNDO_PIXELS, self.rect.right)
         self.rect.top = max(0, self.rect.top)
         self.rect.bottom = min(ALTURA_MUNDO_PIXELS, self.rect.bottom)
 
         agora = pygame.time.get_ticks()
-        if agora - self.ultima_atualizacao_fome_sede > 1500:
+        if agora - self.ultima_atualizacao_fome_sede > 1500: # Diminui fome/sede a cada 1.5 segundos
             self.fome = max(0.0, self.fome - 0.7)
             self.sede = max(0.0, self.sede - 1.5)
             self.ultima_atualizacao_fome_sede = agora
 
-            if self.fome <= 0:
+            if self.fome <= 0: # Perde saúde se a fome for zero
                 self.saude = max(0.0, self.saude - 0.2)
-            if self.sede <= 0:
+            if self.sede <= 0: # Perde saúde se a sede for zero
                 self.saude = max(0.0, self.saude - 0.5)
 
-        if self.saude <= 0:
+        if self.saude <= 0: # Game Over se a saúde chegar a zero
             print("GAME OVER! Sua saúde chegou a zero.")
             global rodando
             rodando = False
 
-        if self.camerashake_duracao > 0:
+        if self.camerashake_duracao > 0: # Diminui a duração do shake da câmera
             self.camerashake_duracao -= 1
             if self.camerashake_duracao <= 0:
                 self.camerashake_intensidade = 0
 
     def sofrer_dano(self, quantidade_dano, shake_intensidade=5, shake_duracao=10):
         self.saude = max(0.0, self.saude - quantidade_dano)
-        self.camerashake_intensidade = shake_intensidade
-        self.camerashake_duracao = shake_duracao
+        self.camerashake_intensidade = shake_intensidade # Ativa o shake
+        self.camerashake_duracao = shake_duracao # Define a duração do shake
         # print(f"Dano recebido! Saúde: {int(self.saude)}%.")
         if self.saude <= 0:
             print("Você foi sobrepujado pelos zumbis!")
@@ -218,7 +223,7 @@ class Jogador(pygame.sprite.Sprite):
             item_texto = fonte_pequena.render(f"{item}: {quantidade}", True, BRANCO)
             tela_surface.blit(item_texto, (x_offset + 10, item_y))
             item_y += 15
-        
+            
         # Desenha a munição separadamente (ou dentro do inventário como um item)
         texto_municao = fonte_media.render(f"Munição: {self.munição}", True, BRANCO)
         tela_surface.blit(texto_municao, (LARGURA_TELA - 120, 10))
@@ -238,7 +243,8 @@ class Zumbi(pygame.sprite.Sprite):
         self.intervalo_dano = 500
         self.ultimo_dano_causado = pygame.time.get_ticks()
 
-        self.vida = 100 # Vida do zumbi
+        self.vida_max = 100 # Vida máxima do zumbi
+        self.vida = self.vida_max # Vida atual do zumbi
         self.morrendo = False # Flag para animação de morte, se houver
 
     def update(self):
@@ -256,6 +262,7 @@ class Zumbi(pygame.sprite.Sprite):
                 self.rect.x += self.velocidade * (dx / dist)
                 self.rect.y += self.velocidade * (dy / dist)
 
+            # Limita o zumbi dentro dos limites do mapa
             self.rect.left = max(0, self.rect.left)
             self.rect.right = min(LARGURA_MUNDO_PIXELS, self.rect.right)
             self.rect.top = max(0, self.rect.top)
@@ -266,6 +273,25 @@ class Zumbi(pygame.sprite.Sprite):
         # print(f"Zumbi recebeu {quantidade_dano} de dano. Vida restante: {self.vida}")
         if self.vida <= 0:
             self.morrendo = True # Pode ativar uma animação de morte aqui
+
+    # Novo método para desenhar a barra de vida do zumbi
+    def desenhar_lifebar(self, tela_surface, camera_offset):
+        # Posição da barra de vida acima do zumbi
+        bar_width = self.rect.width + 10 # Largura da barra um pouco maior que o zumbi
+        bar_height = 5 # Altura da barra
+        
+        # Posição X e Y da barra de vida na tela, ajustada pela câmera
+        bar_x = self.rect.x + camera_offset[0] - 5 # Ajusta para centralizar e adicionar a margem
+        bar_y = self.rect.y + camera_offset[1] - 10 # Acima do zumbi
+
+        # Fundo da barra (vermelho)
+        pygame.draw.rect(tela_surface, VERMELHO, (bar_x, bar_y, bar_width, bar_height))
+
+        # Preenchimento da barra (verde)
+        # Calcula a largura do preenchimento com base na vida atual
+        fill_width = (self.vida / self.vida_max) * bar_width
+        pygame.draw.rect(tela_surface, VERDE, (bar_x, bar_y, fill_width, bar_height))
+
 
 class Projetil(pygame.sprite.Sprite):
     def __init__(self, x_origem, y_origem, x_alvo, y_alvo, dano):
@@ -316,10 +342,10 @@ mapa = []
 for y in range(ALTURA_MAPA_TILES):
     linha = []
     for x in range(LARGURA_MAPA_TILES):
-        if x % 10 == 0 or y % 10 == 0:
-            linha.append(1)
+        if x % 10 == 0 or y % 10 == 0: # Exemplo simples de estrada/parede
+            linha.append(1) # Estrada
         else:
-            linha.append(0)
+            linha.append(0) # Grama
     mapa.append(linha)
 
 
@@ -401,7 +427,7 @@ while rodando:
         for x in range(LARGURA_MAPA_TILES):
             tile_rect = pygame.Rect(x * TAMANHO_TILE, y * TAMANHO_TILE, TAMANHO_TILE, TAMANHO_TILE)
             screen_tile_rect = camera.apply_rect(tile_rect)
-            if screen_tile_rect.colliderect(pygame.Rect(0, 0, LARGURA_TELA, ALTURA_TELA)):
+            if screen_tile_rect.colliderect(pygame.Rect(0, 0, LARGURA_TELA, ALTURA_TELA)): # Desenha apenas tiles visíveis
                 if mapa[y][x] == 0:
                     pygame.draw.rect(tela, VERDE_GRAMA, screen_tile_rect)
                 elif mapa[y][x] == 1:
@@ -410,6 +436,10 @@ while rodando:
     # Desenha os sprites
     for sprite in todos_os_sprites:
         tela.blit(sprite.image, camera.apply(sprite))
+        # Se o sprite for um zumbi, desenha a lifebar dele
+        if isinstance(sprite, Zumbi):
+            # Passa o offset da câmera para o método desenhar_lifebar
+            sprite.desenhar_lifebar(tela, camera.camera.topleft)
 
     jogador.desenhar_barras(tela)
     jogador.desenhar_inventario(tela) # Inventário e munição são desenhados aqui
