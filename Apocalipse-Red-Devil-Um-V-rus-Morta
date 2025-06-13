@@ -27,11 +27,12 @@ CIANO = (0, 255, 255)       # Zumbi Rápido
 MARROM_ESCURO = (100, 40, 0) # Zumbi Gigante
 VERDE_CLARO = (144, 238, 144) # Zumbi Especial
 OURO = (255, 215, 0)         # Cor da arma Pistol
+BEGE = (245, 245, 220)       # Atadura
 
 # --- Configurações do Mapa ---
 TAMANHO_TILE = 32
-LARGURA_MAPA_TILES = 50
-ALTURA_MAPA_TILES = 50
+LARGURA_MAPA_TILES = 100 # Dobrado
+ALTURA_MAPA_TILES = 100 # Dobrado
 LARGURA_MUNDO_PIXELS = LARGURA_MAPA_TILES * TAMANHO_TILE
 ALTURA_MUNDO_PIXELS = ALTURA_MAPA_TILES * TAMANHO_TILE
 
@@ -40,22 +41,22 @@ ALTURA_MUNDO_PIXELS = ALTURA_MAPA_TILES * TAMANHO_TILE
 # As coordenadas são em TILES (multiplicar por TAMANHO_TILE para pixels)
 REGIOES_SPAWN = {
     "Floresta_Comum": {
-        "rect": pygame.Rect(0, 0, 25, 25), # Canto superior esquerdo
+        "rect": pygame.Rect(0, 0, 50, 50), # Agora 50x50 tiles
         "tipos_zumbis": ["Comum", "Rápido"],
         "cor_tile": VERDE_GRAMA
     },
     "Cidade_Destruida": {
-        "rect": pygame.Rect(25, 0, 25, 25), # Canto superior direito
+        "rect": pygame.Rect(50, 0, 50, 50), # 50x50 tiles
         "tipos_zumbis": ["Comum", "Rápido", "Ácido"],
-        "cor_tile": CINZA_ESTRADA # Poderia ser outra cor para "prédios"
+        "cor_tile": CINZA_ESTRADA
     },
-    "Pântano_Radioativo": {
-        "rect": pygame.Rect(0, 25, 25, 25), # Canto inferior esquerdo
+    "Pantano_Radioativo": {
+        "rect": pygame.Rect(0, 50, 50, 50), # 50x50 tiles
         "tipos_zumbis": ["Comum", "Gigante", "Ácido"],
         "cor_tile": (50, 100, 50) # Verde escuro/pantano
     },
     "Suburbio_Abandonado": {
-        "rect": pygame.Rect(25, 25, 25, 25), # Canto inferior direito
+        "rect": pygame.Rect(50, 50, 50, 50), # 50x50 tiles
         "tipos_zumbis": ["Comum", "Especial", "Gigante"],
         "cor_tile": (100, 80, 60) # Cor de terra/sujeira
     }
@@ -109,12 +110,12 @@ class Camera:
 
 class Arma:
     def __init__(self, nome, tipo, dano, cadencia, munição_tipo=None, alcance=0):
-        self.nome = nome # Ex: "Punho", "Pistola", "Espingarda"
-        self.tipo = tipo # "CorpoACorpo" ou "Distancia"
+        self.nome = nome
+        self.tipo = tipo
         self.dano = dano
-        self.cadencia = cadencia # Intervalo mínimo entre ataques (em ms)
-        self.munição_tipo = munição_tipo # Ex: "Balas_Pistola", "Cartuchos_Espingarda"
-        self.alcance = alcance # Para armas de distância ou corpo a corpo (raio de colisão)
+        self.cadencia = cadencia
+        self.munição_tipo = munição_tipo
+        self.alcance = alcance
         self.ultimo_ataque = pygame.time.get_ticks()
 
     def pode_atacar(self):
@@ -124,7 +125,6 @@ class Arma:
         if self.pode_atacar():
             self.ultimo_ataque = pygame.time.get_ticks()
             if self.tipo == "Distancia":
-                # A chave do dicionário munição é o tipo de munição, não o nome da arma
                 if jogador.munição.get(self.munição_tipo, 0) > 0:
                     jogador.munição[self.munição_tipo] -= 1
                     projetil = Projetil(jogador.rect.centerx, jogador.rect.centery,
@@ -133,7 +133,6 @@ class Arma:
                     todos_os_sprites_group.add(projetil)
                     return True
                 else:
-                    # print("Sem munição para esta arma!")
                     return False
             elif self.tipo == "CorpoACorpo":
                 for zumbi in zumbis_group:
@@ -149,6 +148,7 @@ class Jogador(pygame.sprite.Sprite):
         super().__init__()
         self.image = pygame.Surface((30, 30))
         self.image.fill(VERDE)
+        # Começa o jogador no centro do mapa expandido
         self.rect = self.image.get_rect(center=(LARGURA_MUNDO_PIXELS // 2, ALTURA_MUNDO_PIXELS // 2))
         self.velocidade = 5
 
@@ -160,11 +160,11 @@ class Jogador(pygame.sprite.Sprite):
         self.camerashake_duracao = 0
         self.camerashake_intensidade = 0
 
-        self.inventario = {} # Itens como comida, água, etc.
-        self.armas = {"Punho": Arma("Punho", "CorpoACorpo", 10, 300, alcance=40)} # Armas que o jogador possui
-        self.arma_equipada = self.armas["Punho"] # Começa com o punho
+        self.inventario = {}
+        self.armas = {"Punho": Arma("Punho", "CorpoACorpo", 10, 300, alcance=40)}
+        self.arma_equipada = self.armas["Punho"]
 
-        self.munição = {"Pistola": 0} # Tipo de munição específica para cada arma (a chave é o tipo de munição)
+        self.munição = {"Pistola": 0}
 
     def update(self):
         teclas = pygame.key.get_pressed()
@@ -213,19 +213,18 @@ class Jogador(pygame.sprite.Sprite):
             rodando = False
 
     def adicionar_item(self, nome_item, quantidade=1):
-        if "Munição_" in nome_item: # Item é um tipo de munição
-            tipo_municao = nome_item.split("_")[1] # Ex: "Munição_Pistola" -> "Pistola"
+        if "Munição_" in nome_item:
+            tipo_municao = nome_item.split("_")[1]
             self.munição[tipo_municao] = self.munição.get(tipo_municao, 0) + quantidade
             print(f"Munição {tipo_municao} coletada! Total: {self.munição[tipo_municao]}")
-        elif "Arma_" in nome_item: # Item é uma arma
-            nome_arma = nome_item.split("_")[1] # Ex: "Arma_Pistola" -> "Pistola"
+        elif "Arma_" in nome_item:
+            nome_arma = nome_item.split("_")[1]
             if nome_arma == "Pistola" and "Pistola" not in self.armas:
-                # Cria a instância da arma e a adiciona ao dicionário de armas do jogador
                 self.armas["Pistola"] = Arma("Pistola", "Distancia", 30, 250, "Pistola", alcance=300)
                 print(f"Arma {nome_arma} coletada!")
-                self.equipar_arma("Pistola") # Equipa a pistola automaticamente ao coletar
+                self.equipar_arma("Pistola")
             # Adicionar outras armas aqui
-        else: # Item comum (comida, água)
+        else:
             self.inventario[nome_item] = self.inventario.get(nome_item, 0) + quantidade
             print(f"Item coletado: {nome_item} (x{quantidade}). Inventário: {self.inventario}")
 
@@ -237,6 +236,9 @@ class Jogador(pygame.sprite.Sprite):
             elif nome_item == "Agua":
                 self.sede = min(100.0, self.sede + 30)
                 print("Água usada! Sede restaurada.")
+            elif nome_item == "Atadura": # Novo item: Atadura
+                self.saude = min(100.0, self.saude + 25) # Restaura 25 de saúde
+                print("Atadura usada! Saúde restaurada.")
             self.inventario[nome_item] -= 1
             if self.inventario[nome_item] <= 0:
                 del self.inventario[nome_item]
@@ -251,7 +253,6 @@ class Jogador(pygame.sprite.Sprite):
             print(f"Você não possui a arma: {nome_arma}")
 
     def atirar_ou_atacar(self, projeteis_group, todos_os_sprites_group, zumbis_group):
-        # Ação baseada na arma equipada
         pos_mouse_x_tela, pos_mouse_y_tela = pygame.mouse.get_pos()
         alvo_x_mundo = pos_mouse_x_tela - camera.camera.topleft[0]
         alvo_y_mundo = pos_mouse_y_tela - camera.camera.topleft[1]
@@ -260,19 +261,16 @@ class Jogador(pygame.sprite.Sprite):
                                   projeteis_group, todos_os_sprites_group, zumbis_group)
 
     def desenhar_barras(self, tela_surface):
-        # Desenha barra de Fome
         pygame.draw.rect(tela_surface, CINZA, (10, 10, 100, 15))
         pygame.draw.rect(tela_surface, LARANJA, (10, 10, self.fome, 15))
         texto_fome = fonte_pequena.render(f"Fome: {int(self.fome)}%", True, BRANCO)
         tela_surface.blit(texto_fome, (15, 12))
 
-        # Desenha barra de Sede
         pygame.draw.rect(tela_surface, CINZA, (10, 30, 100, 15))
         pygame.draw.rect(tela_surface, AZUL_CLARO, (10, 30, self.sede, 15))
         texto_sede = fonte_pequena.render(f"Sede: {int(self.sede)}%", True, BRANCO)
         tela_surface.blit(texto_sede, (15, 32))
 
-        # Desenha barra de Saúde
         pygame.draw.rect(tela_surface, VERMELHO, (10, 50, 100, 15))
         pygame.draw.rect(tela_surface, VERDE, (10, 50, self.saude, 15))
         texto_saude = fonte_pequena.render(f"Saúde: {int(self.saude)}%", True, BRANCO)
@@ -291,14 +289,12 @@ class Jogador(pygame.sprite.Sprite):
             tela_surface.blit(item_texto, (x_offset + 10, item_y))
             item_y += 15
         
-        # Desenha a arma equipada
         texto_arma = fonte_media.render(f"Arma: {self.arma_equipada.nome}", True, BRANCO)
         tela_surface.blit(texto_arma, (LARGURA_TELA - 150, 10))
 
-        # Desenha a munição, se a arma equipada usar munição
         if self.arma_equipada.tipo == "Distancia":
-            mun_tipo_display = self.arma_equipada.munição_tipo # O tipo de munição que a arma usa
-            mun_qtd = self.munição.get(mun_tipo_display, 0) # A quantidade que o jogador tem desse tipo
+            mun_tipo_display = self.arma_equipada.munição_tipo
+            mun_qtd = self.munição.get(mun_tipo_display, 0)
             texto_municao = fonte_media.render(f"Munição: {mun_qtd}", True, BRANCO)
             tela_surface.blit(texto_municao, (LARGURA_TELA - 150, 35))
 
@@ -326,30 +322,29 @@ class Zumbi(pygame.sprite.Sprite):
         elif self.tipo == "Rápido":
             self.image.fill(CIANO)
             self.vida_max = 70
-            self.velocidade = random.uniform(3.0, 4.5) # Mais rápido
-            self.dano_contato = 3.0 # Menos dano, mas ataca mais
+            self.velocidade = random.uniform(3.0, 4.5)
+            self.dano_contato = 3.0
         elif self.tipo == "Gigante":
-            self.image = pygame.Surface((40, 40)) # Maior
+            self.image = pygame.Surface((40, 40))
             self.image.fill(MARROM_ESCURO)
-            self.vida_max = 250 # Mais vida
-            self.velocidade = random.uniform(0.8, 1.5) # Mais lento
-            self.dano_contato = 15.0 # Mais dano
+            self.vida_max = 250
+            self.velocidade = random.uniform(0.8, 1.5)
+            self.dano_contato = 15.0
         elif self.tipo == "Ácido":
             self.image.fill(ROXO)
             self.vida_max = 90
             self.velocidade = random.uniform(1.5, 3.0)
-            self.dano_contato = 7.0 # Dano direto + potencial de veneno (não implementado ainda)
+            self.dano_contato = 7.0
         elif self.tipo == "Especial": # Zumbi Gritador
             self.image.fill(VERDE_CLARO)
             self.vida_max = 120
             self.velocidade = random.uniform(1.0, 2.0)
             self.dano_contato = 5.0
-            self.intervalo_grito = 5000 # Grita a cada 5 segundos
+            self.intervalo_grito = 5000
             self.ultimo_grito = pygame.time.get_ticks()
         
-        self.vida = self.vida_max # Inicializa a vida do zumbi
+        self.vida = self.vida_max
 
-        # Posição de spawn (se não for passada, será aleatória no mundo)
         if x is None or y is None:
             self.rect.x = random.randrange(0, LARGURA_MUNDO_PIXELS - self.rect.width)
             self.rect.y = random.randrange(0, ALTURA_MUNDO_PIXELS - self.rect.height)
@@ -361,7 +356,7 @@ class Zumbi(pygame.sprite.Sprite):
     def update(self):
         if self.vida <= 0:
             self.kill()
-            return # Zumbi morto não se move nem ataca
+            return
 
         if not self.morrendo:
             dx = self.jogador_ref.rect.centerx - self.rect.centerx
@@ -377,41 +372,31 @@ class Zumbi(pygame.sprite.Sprite):
             self.rect.top = max(0, self.rect.top)
             self.rect.bottom = min(ALTURA_MUNDO_PIXELS, self.rect.bottom)
             
-            # Lógica para Zumbi Especial (Gritador)
             if self.tipo == "Especial":
                 agora = pygame.time.get_ticks()
                 if agora - self.ultimo_grito > self.intervalo_grito:
                     self.ultimo_grito = agora
-                    # print("Zumbi Especial gritou! Atraindo mais zumbis...")
-                    # Simular atração: Spawnar alguns zumbis comuns perto do gritador
-                    for _ in range(random.randint(1, 3)): # Spawna 1 a 3 zumbis
+                    for _ in range(random.randint(1, 3)):
                         novo_zumbi_x = self.rect.centerx + random.randint(-50, 50)
                         novo_zumbi_y = self.rect.centery + random.randint(-50, 50)
-                        spawn_zumbi("Comum", novo_zumbi_x, novo_zumbi_y)
+                        # Garante que os novos zumbis spawnem em um tipo de bioma permitido
+                        # ou perto do zumbi gritador, que já está em um bioma
+                        spawn_zumbi("Comum", novo_zumbi_x, novo_zumbi_y) 
 
     def sofrer_dano(self, quantidade_dano):
         self.vida -= quantidade_dano
         if self.vida <= 0:
-            self.morrendo = True # Ativa flag para morte, se houver animação
-            # print(f"Zumbi {self.tipo} morreu!")
+            self.morrendo = True
 
-    # Novo método para desenhar a barra de vida do zumbi
     def desenhar_lifebar(self, tela_surface, camera_topleft):
-        # Posição da barra de vida acima do zumbi na tela
-        bar_width = self.rect.width + 10 # Largura da barra um pouco maior que o zumbi
-        bar_height = 5 # Altura da barra
+        bar_width = self.rect.width + 10
+        bar_height = 5
         
-        # Converte a posição do zumbi no mundo para a posição na tela
-        # self.rect.x + camera_topleft[0]
-        # self.rect.y + camera_topleft[1]
-        
-        bar_x_tela = self.rect.x + camera_topleft[0] - 5 # Ajusta para centralizar e adicionar a margem
-        bar_y_tela = self.rect.y + camera_topleft[1] - 10 # Acima do zumbi
+        bar_x_tela = self.rect.x + camera_topleft[0] - 5
+        bar_y_tela = self.rect.y + camera_topleft[1] - 10
 
-        # Fundo da barra (vermelho)
         pygame.draw.rect(tela_surface, VERMELHO, (bar_x_tela, bar_y_tela, bar_width, bar_height))
 
-        # Preenchimento da barra (verde)
         fill_width = (self.vida / self.vida_max) * bar_width
         pygame.draw.rect(tela_surface, VERDE, (bar_x_tela, bar_y_tela, fill_width, bar_height))
 
@@ -419,31 +404,28 @@ class Zumbi(pygame.sprite.Sprite):
 class Projetil(pygame.sprite.Sprite):
     def __init__(self, x_origem, y_origem, x_alvo, y_alvo, dano):
         super().__init__()
-        self.image = pygame.Surface((8, 8)) # Tamanho do projétil
-        self.image.fill(AMARELO) # Cor do projétil
+        self.image = pygame.Surface((8, 8))
+        self.image.fill(AMARELO)
         self.rect = self.image.get_rect(center=(x_origem, y_origem))
-        self.velocidade = 15 # Velocidade do projétil
+        self.velocidade = 15
         self.dano = dano
 
-        # Calcula a direção do projétil
         dx = x_alvo - x_origem
         dy = y_alvo - y_origem
         dist = math.hypot(dx, dy)
-        if dist == 0: # Evita divisão por zero se o jogador atirar no próprio pé
+        if dist == 0:
             dist = 1
 
         self.dir_x = dx / dist
         self.dir_y = dy / dist
 
     def update(self):
-        # Move o projétil na direção calculada
         self.rect.x += self.dir_x * self.velocidade
         self.rect.y += self.dir_y * self.velocidade
 
-        # Remove o projétil se sair da tela (do mundo)
         if (self.rect.x < 0 or self.rect.x > LARGURA_MUNDO_PIXELS or
             self.rect.y < 0 or self.rect.y > ALTURA_MUNDO_PIXELS):
-            self.kill() # Remove o projétil de todos os grupos
+            self.kill()
 
 
 class Item(pygame.sprite.Sprite):
@@ -455,10 +437,12 @@ class Item(pygame.sprite.Sprite):
             self.image.fill(MARROM)
         elif self.tipo == "Agua":
             self.image.fill(AZUL_MARINHO)
-        elif self.tipo == "Munição_Pistola": # Munição específica
+        elif self.tipo == "Munição_Pistola":
             self.image.fill(CINZA)
-        elif self.tipo == "Arma_Pistola": # Arma como item
+        elif self.tipo == "Arma_Pistola":
             self.image.fill(OURO)
+        elif self.tipo == "Atadura": # Nova cor para Atadura
+            self.image.fill(BEGE)
         self.rect = self.image.get_rect()
         self.rect.topleft = (x, y)
 
@@ -467,29 +451,16 @@ mapa = []
 for y in range(ALTURA_MAPA_TILES):
     linha = []
     for x in range(LARGURA_MAPA_TILES):
-        # Determina o tipo de tile baseado na região de spawn
-        tile_tipo = 0 # Padrão para grama (cor base será VERDE_GRAMA)
-        for nome_regiao, dados_regiao in REGIOES_SPAWN.items():
-            if dados_regiao["rect"].collidepoint(x, y):
-                # Se estiver em uma região de estrada/cidade, use a cor da região
-                # O mapa não usa mais 0 e 1, mas sim a cor_tile da REGIOES_SPAWN
-                # Então apenas preenchemos com um valor dummy ou podemos remover essa matriz 'mapa'
-                # para desenhar diretamente com base em REGIOES_SPAWN no loop principal.
-                # Por simplicidade, manteremos a matriz para referência de estrutura,
-                # mas o desenho real usará REGIOES_SPAWN.
-                pass 
-        linha.append(0) # Valor dummy, o desenho será baseado nas regiões
+        linha.append(0) 
     mapa.append(linha)
 
 
 # --- Funções de Spawn ---
 def spawn_zumbi(tipo_zumbi, x=None, y=None):
-    if x is None or y is None: # Se não for passada posição, spawna aleatoriamente em uma região
-        # Seleciona uma região aleatória com base nos tipos de zumbis permitidos
-        nome_regiao = random.choice(list(REGIOES_SPAWN.keys()))
-        regiao_data = REGIOES_SPAWN[nome_regiao]
+    if x is None or y is None:
+        regiao = random.choice(list(REGIOES_SPAWN.keys()))
+        regiao_data = REGIOES_SPAWN[regiao]
         
-        # Converte coordenadas da região de tiles para pixels
         spawn_x_min = regiao_data["rect"].left * TAMANHO_TILE
         spawn_y_min = regiao_data["rect"].top * TAMANHO_TILE
         spawn_x_max = regiao_data["rect"].right * TAMANHO_TILE
@@ -498,7 +469,7 @@ def spawn_zumbi(tipo_zumbi, x=None, y=None):
         actual_x = random.randrange(spawn_x_min, spawn_x_max)
         actual_y = random.randrange(spawn_y_min, spawn_y_max)
         zumbi = Zumbi(jogador, tipo_zumbi, actual_x, actual_y)
-    else: # Spawna na posição exata (ex: zumbi gritador chamando reforços)
+    else:
         zumbi = Zumbi(jogador, tipo_zumbi, x, y)
 
     todos_os_sprites.add(zumbi)
@@ -527,10 +498,17 @@ projeteis = pygame.sprite.Group()
 todos_os_sprites.add(jogador)
 
 # Spawna a pistola e alguma munição inicial para ser encontrada perto do jogador
-# (no centro do mapa do mundo)
 spawn_item("Arma_Pistola", LARGURA_MUNDO_PIXELS // 2 + 50, ALTURA_MUNDO_PIXELS // 2)
 spawn_item("Munição_Pistola", LARGURA_MUNDO_PIXELS // 2 + 70, ALTURA_MUNDO_PIXELS // 2 + 20)
 spawn_item("Munição_Pistola", LARGURA_MUNDO_PIXELS // 2 + 90, ALTURA_MUNDO_PIXELS // 2 - 10)
+
+# Spawna mais itens de suprimento pelo mapa
+for _ in range(15): # Aumenta a quantidade de comida/água/atadura
+    item_tipo = random.choice(["Comida", "Agua", "Atadura"])
+    spawn_item(item_tipo)
+
+for _ in range(10): # Mais munição espalhada
+    spawn_item("Munição_Pistola")
 
 
 # Contador de spawn de zumbis
@@ -549,14 +527,16 @@ while rodando:
         if event.type == pygame.QUIT:
             rodando = False
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_1:
+            if event.key == pygame.K_1: # Usar Comida
                 jogador.usar_item("Comida")
-            if event.key == pygame.K_2:
+            if event.key == pygame.K_2: # Usar Água
                 jogador.usar_item("Agua")
-            if event.key == pygame.K_q: # Trocar arma para Punho (Q)
+            if event.key == pygame.K_3: # Usar Atadura (NOVO)
+                jogador.usar_item("Atadura")
+            if event.key == pygame.K_q: # Trocar arma para Punho
                 jogador.equipar_arma("Punho")
-            if event.key == pygame.K_e: # Trocar arma para Pistola (E)
-                jogador.equipar_arma("Pistola") # Certifique-se que o jogador já coletou a pistola!
+            if event.key == pygame.K_e: # Trocar arma para Pistola
+                jogador.equipar_arma("Pistola")
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1: # Botão esquerdo do mouse para atacar/atirar
@@ -570,14 +550,11 @@ while rodando:
     if agora - ultimo_spawn_zumbi > intervalo_spawn_zumbi:
         ultimo_spawn_zumbi = agora
         
-        # Escolhe uma região de spawn aleatoriamente
         nome_regiao = random.choice(list(REGIOES_SPAWN.keys()))
         regiao_data = REGIOES_SPAWN[nome_regiao]
         
-        # Escolhe um tipo de zumbi permitido para essa região
         tipo_zumbi = random.choice(regiao_data["tipos_zumbis"])
 
-        # Spawna o zumbi
         spawn_zumbi(tipo_zumbi)
 
 
@@ -606,15 +583,16 @@ while rodando:
     # 3. Desenho / Renderização
     tela.fill(PRETO)
 
-    # Desenha o Mapa com base nas cores das regiões
+    # Desenha o Mapa com base nas cores das regiões (biomas)
     for y in range(ALTURA_MAPA_TILES):
         for x in range(LARGURA_MAPA_TILES):
             tile_rect = pygame.Rect(x * TAMANHO_TILE, y * TAMANHO_TILE, TAMANHO_TILE, TAMANHO_TILE)
             screen_tile_rect = camera.apply_rect(tile_rect)
             
             if screen_tile_rect.colliderect(pygame.Rect(0, 0, LARGURA_TELA, ALTURA_TELA)):
-                cor_tile = PRETO # Cor padrão, caso não encontre uma região (o que não deve acontecer)
+                cor_tile = PRETO 
                 for nome_regiao, dados_regiao in REGIOES_SPAWN.items():
+                    # Verifica se o tile (x, y) está dentro do retângulo de alguma região
                     if dados_regiao["rect"].collidepoint(x, y):
                         cor_tile = dados_regiao["cor_tile"]
                         break
@@ -623,9 +601,7 @@ while rodando:
     # Desenha os sprites
     for sprite in todos_os_sprites:
         tela.blit(sprite.image, camera.apply(sprite))
-        # Se o sprite for um zumbi, desenha a lifebar dele
         if isinstance(sprite, Zumbi):
-            # Passa o offset da câmera para o método desenhar_lifebar
             sprite.desenhar_lifebar(tela, camera.camera.topleft)
 
     jogador.desenhar_barras(tela)
