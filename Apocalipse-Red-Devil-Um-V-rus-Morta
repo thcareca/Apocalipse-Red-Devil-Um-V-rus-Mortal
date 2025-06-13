@@ -66,14 +66,31 @@ REGIOES_SPAWN = {
 MINIMAP_LARGURA = 200
 MINIMAP_ALTURA = 200
 MINIMAP_POS_X = LARGURA_TELA - MINIMAP_LARGURA - 10
-MINIMAP_POS_Y = 10
+MINIMAP_POS_Y = ALTURA_TELA - MINIMAP_ALTURA - 10
 MINIMAP_BORDA_COR = PRETO
 MINIMAP_BORDA_LARGURA = 2
 
 # --- Inicialização do Pygame ---
 pygame.init()
-tela = pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA))
-pygame.display.set_caption(TITULO_JOGO)
+
+# Variável global para controlar o estado da tela cheia
+TELA_CHEIA = False
+tela = None # Definir como None inicialmente
+
+# --- Função para alternar entre tela cheia e janela ---
+def alternar_tela_cheia():
+    global TELA_CHEIA, tela # Declara que estamos usando as variáveis globais
+    TELA_CHEIA = not TELA_CHEIA
+    if TELA_CHEIA:
+        tela = pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA), pygame.FULLSCREEN)
+    else:
+        tela = pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA))
+    pygame.display.set_caption(TITULO_JOGO) # Garante que o título seja mantido
+
+# Chamada inicial para configurar a tela
+alternar_tela_cheia() if TELA_CHEIA else (tela := pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA)))
+pygame.display.set_caption(TITULO_JOGO) # Definir o título após a configuração inicial
+
 clock = pygame.time.Clock()
 
 # --- Fonte para exibir o texto ---
@@ -219,10 +236,9 @@ class Jogador(pygame.sprite.Sprite):
             global rodando
             rodando = False
 
-    # MODIFICAÇÃO AQUI: Recebe o objeto Item completo
     def adicionar_item(self, item_obj):
         nome_item = item_obj.tipo
-        quantidade = item_obj.quantidade # Pega a quantidade do objeto Item
+        quantidade = item_obj.quantidade
 
         if "Munição_" in nome_item:
             tipo_municao = nome_item.split("_")[1]
@@ -438,12 +454,11 @@ class Projetil(pygame.sprite.Sprite):
             self.rect.y < 0 or self.rect.y > ALTURA_MUNDO_PIXELS):
             self.kill()
 
-# MODIFICAÇÃO AQUI: Adicionado 'quantidade' ao construtor do Item
 class Item(pygame.sprite.Sprite):
     def __init__(self, tipo, x, y, quantidade=1):
         super().__init__()
         self.tipo = tipo
-        self.quantidade = quantidade # Armazena a quantidade
+        self.quantidade = quantidade
         self.image = pygame.Surface((20, 20))
         if self.tipo == "Comida":
             self.image.fill(MARROM)
@@ -459,13 +474,12 @@ class Item(pygame.sprite.Sprite):
         self.rect.topleft = (x, y)
 
 # --- Geração do Mapa ---
-# A função de geração do mapa agora retorna uma Surface pré-renderizada
 def gerar_mapa_mundo():
     world_surface = pygame.Surface((LARGURA_MUNDO_PIXELS, ALTURA_MUNDO_PIXELS))
     for y_tile in range(ALTURA_MAPA_TILES):
         for x_tile in range(LARGURA_MAPA_TILES):
             tile_rect = pygame.Rect(x_tile * TAMANHO_TILE, y_tile * TAMANHO_TILE, TAMANHO_TILE, TAMANHO_TILE)
-            cor_tile = PRETO # Cor padrão caso não esteja em nenhuma região
+            cor_tile = PRETO
 
             for nome_regiao, dados_regiao in REGIOES_SPAWN.items():
                 if dados_regiao["rect"].collidepoint(x_tile, y_tile):
@@ -474,7 +488,6 @@ def gerar_mapa_mundo():
             pygame.draw.rect(world_surface, cor_tile, tile_rect)
     return world_surface
 
-# Pré-renderiza o mapa do mundo uma vez
 mapa_mundo_surface = gerar_mapa_mundo()
 
 
@@ -499,7 +512,6 @@ def spawn_zumbi(tipo_zumbi, x=None, y=None):
     zumbis.add(zumbi)
     return zumbi
 
-# MODIFICAÇÃO AQUI: Adicionado 'quantidade' ao spawn_item
 def spawn_item(tipo_item, x=None, y=None, quantidade=1):
     if x is None or y is None:
         actual_x = random.randrange(0, LARGURA_MUNDO_PIXELS - TAMANHO_TILE)
@@ -507,7 +519,6 @@ def spawn_item(tipo_item, x=None, y=None, quantidade=1):
     else:
         actual_x = x
         actual_y = y
-    # Passa a quantidade para o construtor do Item
     item = Item(tipo_item, actual_x, actual_y, quantidade)
     todos_os_sprites.add(item)
     itens_coletaveis.add(item)
@@ -522,16 +533,13 @@ projeteis = pygame.sprite.Group()
 
 todos_os_sprites.add(jogador)
 
-# MODIFICAÇÃO AQUI: Especificando quantidade=25 para Munição_Pistola
-# Spawna a pistola e alguma munição inicial para ser encontrada perto do jogador
 spawn_item("Arma_Pistola", LARGURA_MUNDO_PIXELS // 2 + 50, ALTURA_MUNDO_PIXELS // 2)
 spawn_item("Munição_Pistola", LARGURA_MUNDO_PIXELS // 2 + 70, ALTURA_MUNDO_PIXELS // 2 + 20, quantidade=25)
 spawn_item("Munição_Pistola", LARGURA_MUNDO_PIXELS // 2 + 90, ALTURA_MUNDO_PIXELS // 2 - 10, quantidade=25)
 
-# Spawna mais itens de suprimento pelo mapa
 for _ in range(15):
     item_tipo = random.choice(["Comida", "Agua", "Atadura"])
-    spawn_item(item_tipo) # Estes usarão a quantidade padrão (1)
+    spawn_item(item_tipo)
 
 for _ in range(10):
     spawn_item("Munição_Pistola", quantidade=25)
@@ -539,8 +547,7 @@ for _ in range(10):
 
 # Contador de spawn de zumbis
 ultimo_spawn_zumbi = pygame.time.get_ticks()
-intervalo_spawn_zumbi = 3000 # Spawna zumbi a cada 3 segundos
-
+intervalo_spawn_zumbi = 3000
 
 # --- Câmera do Jogo ---
 camera = Camera(LARGURA_MUNDO_PIXELS, ALTURA_MUNDO_PIXELS)
@@ -563,6 +570,9 @@ while rodando:
                 jogador.equipar_arma("Punho")
             if event.key == pygame.K_e: # Trocar arma para Pistola
                 jogador.equipar_arma("Pistola")
+            if event.key == pygame.K_F11: # Alternar tela cheia
+                alternar_tela_cheia()
+
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1: # Botão esquerdo do mouse para atacar/atirar
@@ -571,7 +581,6 @@ while rodando:
     # 2. Atualização dos Estados do Jogo
     todos_os_sprites.update()
 
-    # Lógica de spawn de zumbis periódica
     agora = pygame.time.get_ticks()
     if agora - ultimo_spawn_zumbi > intervalo_spawn_zumbi:
         ultimo_spawn_zumbi = agora
@@ -583,8 +592,6 @@ while rodando:
 
         spawn_zumbi(tipo_zumbi)
 
-
-    # Detecção de Colisão: Jogador vs. Zumbis
     colisoes_zumbi_jogador = pygame.sprite.spritecollide(jogador, zumbis, False)
     agora = pygame.time.get_ticks()
     for zumbi_atingido in colisoes_zumbi_jogador:
@@ -592,13 +599,10 @@ while rodando:
             jogador.sofrer_dano(zumbi_atingido.dano_contato, shake_intensidade=5, shake_duracao=10)
             zumbi_atingido.ultimo_dano_causado = agora
 
-    # MODIFICAÇÃO AQUI: Passa o objeto item_coletado completo
-    # Detecção de Colisão: Jogador vs. Itens
     colisoes_itens = pygame.sprite.spritecollide(jogador, itens_coletaveis, True)
     for item_coletado in colisoes_itens:
-        jogador.adicionar_item(item_coletado) # Passa o objeto item completo
+        jogador.adicionar_item(item_coletado)
     
-    # Detecção de Colisão: Projéteis vs. Zumbis
     for projetil in projeteis:
         colisoes_projetil_zumbi = pygame.sprite.spritecollide(projetil, zumbis, False)
         for zumbi_atingido_por_bala in colisoes_projetil_zumbi:
@@ -610,10 +614,8 @@ while rodando:
     # 3. Desenho / Renderização
     tela.fill(PRETO)
 
-    # Desenha o Mapa Principal
     tela.blit(mapa_mundo_surface, camera.apply_rect(mapa_mundo_surface.get_rect()))
             
-    # Desenha os sprites
     for sprite in todos_os_sprites:
         tela.blit(sprite.image, camera.apply(sprite))
         if isinstance(sprite, Zumbi):
@@ -624,44 +626,48 @@ while rodando:
 
     # --- Desenho do Minimapa ---
     minimap_surface = pygame.Surface((MINIMAP_LARGURA, MINIMAP_ALTURA))
-    minimap_surface.fill(PRETO) # Fundo do minimapa
+    minimap_surface.fill(PRETO)
 
-    # Calcula a escala do minimapa
-    escala_minimap_x = MINIMAP_LARGURA / LARGURA_MUNDO_PIXELS
-    escala_minimap_y = MINIMAP_ALTURA / ALTURA_MUNDO_PIXELS
+    visao_centro_x = jogador.rect.centerx
+    visao_centro_y = jogador.rect.centery
 
-    # Desenha o mapa do mundo no minimapa
-    scaled_map_surface = pygame.transform.scale(mapa_mundo_surface, (MINIMAP_LARGURA, MINIMAP_ALTURA))
-    minimap_surface.blit(scaled_map_surface, (0, 0))
+    area_visao_mundo_largura = 600
+    area_visao_mundo_altura = 600
 
-    # Desenha o jogador no minimapa
-    jogador_minimap_x = int(jogador.rect.centerx * escala_minimap_x)
-    jogador_minimap_y = int(jogador.rect.centery * escala_minimap_y)
+    visao_mundo_x1 = max(0, visao_centro_x - area_visao_mundo_largura // 2)
+    visao_mundo_y1 = max(0, visao_centro_y - area_visao_mundo_altura // 2)
+
+    visao_mundo_x1 = min(visao_mundo_x1, LARGURA_MUNDO_PIXELS - area_visao_mundo_largura)
+    visao_mundo_y1 = min(visao_mundo_y1, ALTURA_MUNDO_PIXELS - area_visao_mundo_altura)
+
+    clip_rect = pygame.Rect(visao_mundo_x1, visao_mundo_y1, area_visao_mundo_largura, area_visao_mundo_altura)
+
+    try:
+        sub_map_surface = mapa_mundo_surface.subsurface(clip_rect)
+    except ValueError:
+        sub_map_surface = pygame.Surface((1,1))
+
+
+    scaled_minimap_view = pygame.transform.scale(sub_map_surface, (MINIMAP_LARGURA, MINIMAP_ALTURA))
+    minimap_surface.blit(scaled_minimap_view, (0, 0))
+
+    jogador_minimap_x = MINIMAP_LARGURA // 2
+    jogador_minimap_y = MINIMAP_ALTURA // 2
     pygame.draw.circle(minimap_surface, VERDE, (jogador_minimap_x, jogador_minimap_y), 4)
 
-    # Desenha os zumbis no minimapa
     for zumbi_sprite in zumbis:
-        zumbi_minimap_x = int(zumbi_sprite.rect.centerx * escala_minimap_x)
-        zumbi_minimap_y = int(zumbi_sprite.rect.centery * escala_minimap_y)
-        pygame.draw.circle(minimap_surface, VERMELHO, (zumbi_minimap_x, zumbi_minimap_y), 2)
+        zumbi_rel_x = zumbi_sprite.rect.centerx - visao_mundo_x1
+        zumbi_rel_y = zumbi_sprite.rect.centery - visao_mundo_y1
+
+        if 0 <= zumbi_rel_x < area_visao_mundo_largura and \
+           0 <= zumbi_rel_y < area_visao_mundo_altura:
+            
+            zumbi_minimap_x = int(zumbi_rel_x * (MINIMAP_LARGURA / area_visao_mundo_largura))
+            zumbi_minimap_y = int(zumbi_rel_y * (MINIMAP_ALTURA / area_visao_mundo_altura))
+            
+            pygame.draw.circle(minimap_surface, VERMELHO, (zumbi_minimap_x, zumbi_minimap_y), 2)
     
-    # Desenha a "tela" do jogador no minimapa (o que ele está vendo)
-    # A área que o jogador está vendo na tela principal
-    visao_x_mundo = jogador.rect.centerx - LARGURA_TELA // 2
-    visao_y_mundo = jogador.rect.centery - ALTURA_TELA // 2
-
-    # Converte as coordenadas do mundo para coordenadas do minimapa
-    visao_minimap_x = int(max(0, visao_x_mundo) * escala_minimap_x)
-    visao_minimap_y = int(max(0, visao_y_mundo) * escala_minimap_y)
-    visao_minimap_largura = int(LARGURA_TELA * escala_minimap_x)
-    visao_minimap_altura = int(ALTURA_TELA * escala_minimap_y)
-
-    pygame.draw.rect(minimap_surface, BRANCO, (visao_minimap_x, visao_minimap_y, visao_minimap_largura, visao_minimap_altura), 1)
-
-
-    # Desenha o minimapa na tela principal
     tela.blit(minimap_surface, (MINIMAP_POS_X, MINIMAP_POS_Y))
-    # Desenha uma borda para o minimapa
     pygame.draw.rect(tela, MINIMAP_BORDA_COR, (MINIMAP_POS_X, MINIMAP_POS_Y, MINIMAP_LARGURA, MINIMAP_ALTURA), MINIMAP_BORDA_LARGURA)
 
 
