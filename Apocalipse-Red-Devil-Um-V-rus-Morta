@@ -26,41 +26,49 @@ ROXO = (128, 0, 128)        # Zumbi Ácido
 CIANO = (0, 255, 255)       # Zumbi Rápido
 MARROM_ESCURO = (100, 40, 0) # Zumbi Gigante
 VERDE_CLARO = (144, 238, 144) # Zumbi Especial
-OURO = (255, 215, 0)         # Cor da arma Pistol
-BEGE = (245, 245, 220)       # Atadura
+OURO = (255, 215, 0)        # Cor da arma Pistol
+BEGE = (245, 245, 220)      # Atadura
+VERDE_PANTANO = (50, 100, 50) # Verde escuro/pantano
+TERRA_SUJEIRA = (100, 80, 60) # Cor de terra/sujeira
 
 # --- Configurações do Mapa ---
 TAMANHO_TILE = 32
-LARGURA_MAPA_TILES = 100 # Dobrado
-ALTURA_MAPA_TILES = 100 # Dobrado
+LARGURA_MAPA_TILES = 100
+ALTURA_MAPA_TILES = 100
 LARGURA_MUNDO_PIXELS = LARGURA_MAPA_TILES * TAMANHO_TILE
 ALTURA_MUNDO_PIXELS = ALTURA_MAPA_TILES * TAMANHO_TILE
 
 # --- Regiões de Spawn (exemplo de biomas simplificados) ---
-# Definimos regiões (retângulos no mapa) e quais zumbis spawnarão nelas
-# As coordenadas são em TILES (multiplicar por TAMANHO_TILE para pixels)
 REGIOES_SPAWN = {
     "Floresta_Comum": {
-        "rect": pygame.Rect(0, 0, 50, 50), # Agora 50x50 tiles
+        "rect": pygame.Rect(0, 0, 50, 50),
         "tipos_zumbis": ["Comum", "Rápido"],
         "cor_tile": VERDE_GRAMA
     },
     "Cidade_Destruida": {
-        "rect": pygame.Rect(50, 0, 50, 50), # 50x50 tiles
+        "rect": pygame.Rect(50, 0, 50, 50),
         "tipos_zumbis": ["Comum", "Rápido", "Ácido"],
         "cor_tile": CINZA_ESTRADA
     },
     "Pantano_Radioativo": {
-        "rect": pygame.Rect(0, 50, 50, 50), # 50x50 tiles
+        "rect": pygame.Rect(0, 50, 50, 50),
         "tipos_zumbis": ["Comum", "Gigante", "Ácido"],
-        "cor_tile": (50, 100, 50) # Verde escuro/pantano
+        "cor_tile": VERDE_PANTANO
     },
     "Suburbio_Abandonado": {
-        "rect": pygame.Rect(50, 50, 50, 50), # 50x50 tiles
+        "rect": pygame.Rect(50, 50, 50, 50),
         "tipos_zumbis": ["Comum", "Especial", "Gigante"],
-        "cor_tile": (100, 80, 60) # Cor de terra/sujeira
+        "cor_tile": TERRA_SUJEIRA
     }
 }
+
+# --- Configurações do Minimapa ---
+MINIMAP_LARGURA = 200
+MINIMAP_ALTURA = 200
+MINIMAP_POS_X = LARGURA_TELA - MINIMAP_LARGURA - 10
+MINIMAP_POS_Y = 10
+MINIMAP_BORDA_COR = BRANCO
+MINIMAP_BORDA_LARGURA = 2
 
 # --- Inicialização do Pygame ---
 pygame.init()
@@ -85,11 +93,11 @@ class Camera:
 
     def apply(self, entity):
         return entity.rect.move(self.camera.topleft[0] + self.shake_offset_x,
-                                self.camera.topleft[1] + self.shake_offset_y)
+                                 self.camera.topleft[1] + self.shake_offset_y)
 
     def apply_rect(self, rect):
         return rect.move(self.camera.topleft[0] + self.shake_offset_x,
-                        self.camera.topleft[1] + self.shake_offset_y)
+                         self.camera.topleft[1] + self.shake_offset_y)
 
     def update(self, target, shake_duracao=0, shake_intensidade=0):
         x = -target.rect.centerx + LARGURA_TELA // 2
@@ -148,7 +156,6 @@ class Jogador(pygame.sprite.Sprite):
         super().__init__()
         self.image = pygame.Surface((30, 30))
         self.image.fill(VERDE)
-        # Começa o jogador no centro do mapa expandido
         self.rect = self.image.get_rect(center=(LARGURA_MUNDO_PIXELS // 2, ALTURA_MUNDO_PIXELS // 2))
         self.velocidade = 5
 
@@ -236,8 +243,8 @@ class Jogador(pygame.sprite.Sprite):
             elif nome_item == "Agua":
                 self.sede = min(100.0, self.sede + 30)
                 print("Água usada! Sede restaurada.")
-            elif nome_item == "Atadura": # Novo item: Atadura
-                self.saude = min(100.0, self.saude + 25) # Restaura 25 de saúde
+            elif nome_item == "Atadura":
+                self.saude = min(100.0, self.saude + 25)
                 print("Atadura usada! Saúde restaurada.")
             self.inventario[nome_item] -= 1
             if self.inventario[nome_item] <= 0:
@@ -342,7 +349,7 @@ class Zumbi(pygame.sprite.Sprite):
             self.dano_contato = 5.0
             self.intervalo_grito = 5000
             self.ultimo_grito = pygame.time.get_ticks()
-        
+            
         self.vida = self.vida_max
 
         if x is None or y is None:
@@ -441,18 +448,29 @@ class Item(pygame.sprite.Sprite):
             self.image.fill(CINZA)
         elif self.tipo == "Arma_Pistola":
             self.image.fill(OURO)
-        elif self.tipo == "Atadura": # Nova cor para Atadura
+        elif self.tipo == "Atadura":
             self.image.fill(BEGE)
         self.rect = self.image.get_rect()
         self.rect.topleft = (x, y)
 
 # --- Geração do Mapa ---
-mapa = []
-for y in range(ALTURA_MAPA_TILES):
-    linha = []
-    for x in range(LARGURA_MAPA_TILES):
-        linha.append(0) 
-    mapa.append(linha)
+# A função de geração do mapa agora retorna uma Surface pré-renderizada
+def gerar_mapa_mundo():
+    world_surface = pygame.Surface((LARGURA_MUNDO_PIXELS, ALTURA_MUNDO_PIXELS))
+    for y_tile in range(ALTURA_MAPA_TILES):
+        for x_tile in range(LARGURA_MAPA_TILES):
+            tile_rect = pygame.Rect(x_tile * TAMANHO_TILE, y_tile * TAMANHO_TILE, TAMANHO_TILE, TAMANHO_TILE)
+            cor_tile = PRETO # Cor padrão caso não esteja em nenhuma região
+
+            for nome_regiao, dados_regiao in REGIOES_SPAWN.items():
+                if dados_regiao["rect"].collidepoint(x_tile, y_tile):
+                    cor_tile = dados_regiao["cor_tile"]
+                    break
+            pygame.draw.rect(world_surface, cor_tile, tile_rect)
+    return world_surface
+
+# Pré-renderiza o mapa do mundo uma vez
+mapa_mundo_surface = gerar_mapa_mundo()
 
 
 # --- Funções de Spawn ---
@@ -503,11 +521,11 @@ spawn_item("Munição_Pistola", LARGURA_MUNDO_PIXELS // 2 + 70, ALTURA_MUNDO_PIX
 spawn_item("Munição_Pistola", LARGURA_MUNDO_PIXELS // 2 + 90, ALTURA_MUNDO_PIXELS // 2 - 10)
 
 # Spawna mais itens de suprimento pelo mapa
-for _ in range(15): # Aumenta a quantidade de comida/água/atadura
+for _ in range(15):
     item_tipo = random.choice(["Comida", "Agua", "Atadura"])
     spawn_item(item_tipo)
 
-for _ in range(10): # Mais munição espalhada
+for _ in range(10):
     spawn_item("Munição_Pistola")
 
 
@@ -583,21 +601,9 @@ while rodando:
     # 3. Desenho / Renderização
     tela.fill(PRETO)
 
-    # Desenha o Mapa com base nas cores das regiões (biomas)
-    for y in range(ALTURA_MAPA_TILES):
-        for x in range(LARGURA_MAPA_TILES):
-            tile_rect = pygame.Rect(x * TAMANHO_TILE, y * TAMANHO_TILE, TAMANHO_TILE, TAMANHO_TILE)
-            screen_tile_rect = camera.apply_rect(tile_rect)
+    # Desenha o Mapa Principal
+    tela.blit(mapa_mundo_surface, camera.apply_rect(mapa_mundo_surface.get_rect()))
             
-            if screen_tile_rect.colliderect(pygame.Rect(0, 0, LARGURA_TELA, ALTURA_TELA)):
-                cor_tile = PRETO 
-                for nome_regiao, dados_regiao in REGIOES_SPAWN.items():
-                    # Verifica se o tile (x, y) está dentro do retângulo de alguma região
-                    if dados_regiao["rect"].collidepoint(x, y):
-                        cor_tile = dados_regiao["cor_tile"]
-                        break
-                pygame.draw.rect(tela, cor_tile, screen_tile_rect)
-    
     # Desenha os sprites
     for sprite in todos_os_sprites:
         tela.blit(sprite.image, camera.apply(sprite))
@@ -606,6 +612,49 @@ while rodando:
 
     jogador.desenhar_barras(tela)
     jogador.desenhar_inventario(tela)
+
+    # --- Desenho do Minimapa ---
+    minimap_surface = pygame.Surface((MINIMAP_LARGURA, MINIMAP_ALTURA))
+    minimap_surface.fill(PRETO) # Fundo do minimapa
+
+    # Calcula a escala do minimapa
+    escala_minimap_x = MINIMAP_LARGURA / LARGURA_MUNDO_PIXELS
+    escala_minimap_y = MINIMAP_ALTURA / ALTURA_MUNDO_PIXELS
+
+    # Desenha o mapa do mundo no minimapa
+    scaled_map_surface = pygame.transform.scale(mapa_mundo_surface, (MINIMAP_LARGURA, MINIMAP_ALTURA))
+    minimap_surface.blit(scaled_map_surface, (0, 0))
+
+    # Desenha o jogador no minimapa
+    jogador_minimap_x = int(jogador.rect.centerx * escala_minimap_x)
+    jogador_minimap_y = int(jogador.rect.centery * escala_minimap_y)
+    pygame.draw.circle(minimap_surface, VERDE, (jogador_minimap_x, jogador_minimap_y), 4)
+
+    # Desenha os zumbis no minimapa
+    for zumbi_sprite in zumbis:
+        zumbi_minimap_x = int(zumbi_sprite.rect.centerx * escala_minimap_x)
+        zumbi_minimap_y = int(zumbi_sprite.rect.centery * escala_minimap_y)
+        pygame.draw.circle(minimap_surface, VERMELHO, (zumbi_minimap_x, zumbi_minimap_y), 2)
+    
+    # Desenha a "tela" do jogador no minimapa (o que ele está vendo)
+    # A área que o jogador está vendo na tela principal
+    visao_x_mundo = jogador.rect.centerx - LARGURA_TELA // 2
+    visao_y_mundo = jogador.rect.centery - ALTURA_TELA // 2
+
+    # Converte as coordenadas do mundo para coordenadas do minimapa
+    visao_minimap_x = int(max(0, visao_x_mundo) * escala_minimap_x)
+    visao_minimap_y = int(max(0, visao_y_mundo) * escala_minimap_y)
+    visao_minimap_largura = int(LARGURA_TELA * escala_minimap_x)
+    visao_minimap_altura = int(ALTURA_TELA * escala_minimap_y)
+
+    pygame.draw.rect(minimap_surface, BRANCO, (visao_minimap_x, visao_minimap_y, visao_minimap_largura, visao_minimap_altura), 1)
+
+
+    # Desenha o minimapa na tela principal
+    tela.blit(minimap_surface, (MINIMAP_POS_X, MINIMAP_POS_Y))
+    # Desenha uma borda para o minimapa
+    pygame.draw.rect(tela, MINIMAP_BORDA_COR, (MINIMAP_POS_X, MINIMAP_POS_Y, MINIMAP_LARGURA, MINIMAP_ALTURA), MINIMAP_BORDA_LARGURA)
+
 
     pygame.display.flip()
 
