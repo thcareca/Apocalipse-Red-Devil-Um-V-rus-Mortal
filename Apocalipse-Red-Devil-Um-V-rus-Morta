@@ -26,10 +26,11 @@ ROXO = (128, 0, 128)        # Zumbi Ácido
 CIANO = (0, 255, 255)       # Zumbi Rápido
 MARROM_ESCURO = (100, 40, 0) # Zumbi Gigante
 VERDE_CLARO = (144, 238, 144) # Zumbi Especial
-OURO = (255, 215, 0)        # Cor da arma Pistol
+OURO = (255, 215, 0)         # Cor da arma Pistol
 BEGE = (245, 245, 220)      # Atadura
 VERDE_PANTANO = (50, 100, 50) # Verde escuro/pantano
 TERRA_SUJEIRA = (100, 80, 60) # Cor de terra/sujeira
+AMARELO_DANO = (255, 255, 100) # Cor para o texto de dano
 
 # --- Configurações do Mapa ---
 TAMANHO_TILE = 32
@@ -80,6 +81,7 @@ clock = pygame.time.Clock()
 fonte_pequena = pygame.font.Font(None, 20)
 fonte_media = pygame.font.Font(None, 24)
 fonte_grande = pygame.font.Font(None, 36)
+fonte_dano = pygame.font.Font(None, 22) # Fonte para o contador de dano
 
 # --- Classes do Jogo ---
 
@@ -136,7 +138,7 @@ class Arma:
                 if jogador.munição.get(self.munição_tipo, 0) > 0:
                     jogador.munição[self.munição_tipo] -= 1
                     projetil = Projetil(jogador.rect.centerx, jogador.rect.centery,
-                                        alvo_x_mundo, alvo_y_mundo, self.dano)
+                                         alvo_x_mundo, alvo_y_mundo, self.dano)
                     projeteis_group.add(projetil)
                     todos_os_sprites_group.add(projetil)
                     return True
@@ -214,6 +216,8 @@ class Jogador(pygame.sprite.Sprite):
         self.saude = max(0.0, self.saude - quantidade_dano)
         self.camerashake_intensidade = shake_intensidade
         self.camerashake_duracao = shake_duracao
+        # Adiciona o texto de dano para o jogador, ajustando a posição
+        damage_texts.add(DamageText(self.rect.centerx, self.rect.top - 20, int(quantidade_dano), VERMELHO))
         if self.saude <= 0:
             print("Você foi sobrepujado pelos zumbis!")
             global rodando
@@ -251,7 +255,7 @@ class Jogador(pygame.sprite.Sprite):
                 del self.inventario[nome_item]
             return True
         return False
-    
+   
     def equipar_arma(self, nome_arma):
         if nome_arma in self.armas:
             self.arma_equipada = self.armas[nome_arma]
@@ -295,7 +299,7 @@ class Jogador(pygame.sprite.Sprite):
             item_texto = fonte_pequena.render(f"{item}: {quantidade}", True, BRANCO)
             tela_surface.blit(item_texto, (x_offset + 10, item_y))
             item_y += 15
-        
+           
         texto_arma = fonte_media.render(f"Arma: {self.arma_equipada.nome}", True, BRANCO)
         tela_surface.blit(texto_arma, (LARGURA_TELA - 150, 10))
 
@@ -349,7 +353,7 @@ class Zumbi(pygame.sprite.Sprite):
             self.dano_contato = 5.0
             self.intervalo_grito = 5000
             self.ultimo_grito = pygame.time.get_ticks()
-            
+           
         self.vida = self.vida_max
 
         if x is None or y is None:
@@ -378,7 +382,7 @@ class Zumbi(pygame.sprite.Sprite):
             self.rect.right = min(LARGURA_MUNDO_PIXELS, self.rect.right)
             self.rect.top = max(0, self.rect.top)
             self.rect.bottom = min(ALTURA_MUNDO_PIXELS, self.rect.bottom)
-            
+           
             if self.tipo == "Especial":
                 agora = pygame.time.get_ticks()
                 if agora - self.ultimo_grito > self.intervalo_grito:
@@ -392,13 +396,15 @@ class Zumbi(pygame.sprite.Sprite):
 
     def sofrer_dano(self, quantidade_dano):
         self.vida -= quantidade_dano
+        # Adiciona o texto de dano, ajustando a posição para ficar ao lado do zumbi
+        damage_texts.add(DamageText(self.rect.centerx + random.randint(-10, 10), self.rect.top - 15, int(quantidade_dano), AMARELO_DANO))
         if self.vida <= 0:
             self.morrendo = True
 
     def desenhar_lifebar(self, tela_surface, camera_topleft):
         bar_width = self.rect.width + 10
         bar_height = 5
-        
+       
         bar_x_tela = self.rect.x + camera_topleft[0] - 5
         bar_y_tela = self.rect.y + camera_topleft[1] - 10
 
@@ -453,6 +459,28 @@ class Item(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
         self.rect.topleft = (x, y)
 
+class DamageText(pygame.sprite.Sprite):
+    def __init__(self, x, y, damage, color):
+        super().__init__()
+        self.value = damage
+        self.font = fonte_dano
+        self.color = color
+        self.image = self.font.render(str(self.value), True, self.color)
+        self.rect = self.image.get_rect(center=(x, y))
+        self.life_time = 60 # Frames to live (e.g., 60 frames = 1 second)
+        self.alpha = 255 # Initial opacity
+
+    def update(self):
+        self.rect.y -= 1 # Move upwards
+        self.life_time -= 1
+        if self.life_time <= 0:
+            self.kill()
+        
+        # Fade out the text
+        self.alpha = max(0, self.alpha - (255 / 60)) # Reduce alpha over its lifetime
+        self.image.set_alpha(self.alpha)
+
+
 # --- Geração do Mapa ---
 # A função de geração do mapa agora retorna uma Surface pré-renderizada
 def gerar_mapa_mundo():
@@ -478,7 +506,7 @@ def spawn_zumbi(tipo_zumbi, x=None, y=None):
     if x is None or y is None:
         regiao = random.choice(list(REGIOES_SPAWN.keys()))
         regiao_data = REGIOES_SPAWN[regiao]
-        
+       
         spawn_x_min = regiao_data["rect"].left * TAMANHO_TILE
         spawn_y_min = regiao_data["rect"].top * TAMANHO_TILE
         spawn_x_max = regiao_data["rect"].right * TAMANHO_TILE
@@ -500,7 +528,7 @@ def spawn_item(tipo_item, x=None, y=None):
         actual_y = random.randrange(0, ALTURA_MUNDO_PIXELS - TAMANHO_TILE)
     else:
         actual_x = x
-        actual_y = y
+    actual_y = y
     item = Item(tipo_item, actual_x, actual_y)
     todos_os_sprites.add(item)
     itens_coletaveis.add(item)
@@ -512,6 +540,7 @@ todos_os_sprites = pygame.sprite.Group()
 itens_coletaveis = pygame.sprite.Group()
 zumbis = pygame.sprite.Group()
 projeteis = pygame.sprite.Group()
+damage_texts = pygame.sprite.Group() # Novo grupo para textos de dano
 
 todos_os_sprites.add(jogador)
 
@@ -562,15 +591,16 @@ while rodando:
 
     # 2. Atualização dos Estados do Jogo
     todos_os_sprites.update()
+    damage_texts.update() # Atualiza os textos de dano
 
     # Lógica de spawn de zumbis periódica
     agora = pygame.time.get_ticks()
     if agora - ultimo_spawn_zumbi > intervalo_spawn_zumbi:
         ultimo_spawn_zumbi = agora
-        
+       
         nome_regiao = random.choice(list(REGIOES_SPAWN.keys()))
         regiao_data = REGIOES_SPAWN[nome_regiao]
-        
+       
         tipo_zumbi = random.choice(regiao_data["tipos_zumbis"])
 
         spawn_zumbi(tipo_zumbi)
@@ -588,7 +618,7 @@ while rodando:
     colisoes_itens = pygame.sprite.spritecollide(jogador, itens_coletaveis, True)
     for item_coletado in colisoes_itens:
         jogador.adicionar_item(item_coletado.tipo)
-    
+   
     # Detecção de Colisão: Projéteis vs. Zumbis
     for projetil in projeteis:
         colisoes_projetil_zumbi = pygame.sprite.spritecollide(projetil, zumbis, False)
@@ -603,12 +633,17 @@ while rodando:
 
     # Desenha o Mapa Principal
     tela.blit(mapa_mundo_surface, camera.apply_rect(mapa_mundo_surface.get_rect()))
-            
-    # Desenha os sprites
+           
+    # Desenha os sprites e os textos de dano, aplicando a câmera
     for sprite in todos_os_sprites:
         tela.blit(sprite.image, camera.apply(sprite))
         if isinstance(sprite, Zumbi):
             sprite.desenhar_lifebar(tela, camera.camera.topleft)
+            
+    # Desenha os textos de dano (separado para garantir que fiquem acima de tudo, mas ainda com a câmera)
+    for text_sprite in damage_texts:
+        tela.blit(text_sprite.image, camera.apply(text_sprite))
+
 
     jogador.desenhar_barras(tela)
     jogador.desenhar_inventario(tela)
@@ -635,7 +670,7 @@ while rodando:
         zumbi_minimap_x = int(zumbi_sprite.rect.centerx * escala_minimap_x)
         zumbi_minimap_y = int(zumbi_sprite.rect.centery * escala_minimap_y)
         pygame.draw.circle(minimap_surface, VERMELHO, (zumbi_minimap_x, zumbi_minimap_y), 2)
-    
+   
     # Desenha a "tela" do jogador no minimapa (o que ele está vendo)
     # A área que o jogador está vendo na tela principal
     visao_x_mundo = jogador.rect.centerx - LARGURA_TELA // 2
